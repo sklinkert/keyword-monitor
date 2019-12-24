@@ -1,31 +1,29 @@
 package main
 
 import (
+	"github.com/lfritz/env"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	customsearch "google.golang.org/api/customsearch/v1"
-	"github.com/lfritz/env"
 	"io/ioutil"
 	"strings"
 )
 
-var config struct{
-	keywords    []string
-	domain    string
-	id string
+var config struct {
+	keywords []string
+	domain   string
+	id       string
 }
 
+// Result is a search result
 type Result struct {
 	Position int64
 	Result   *customsearch.Result
 }
 
-
 func doSearch(search *customsearch.CseListCall) (result Result) {
 	start := int64(1)
-
-	// CSE Limits you to 10 pages of results with max 10 results per page
 	for start < 300 {
 		search.Start(start)
 		call, err := search.Do()
@@ -34,7 +32,6 @@ func doSearch(search *customsearch.CseListCall) (result Result) {
 		}
 
 		position, csResult := findDomain(call.Items, start)
-
 		if csResult != nil {
 			result = Result{
 				Position: position,
@@ -43,7 +40,7 @@ func doSearch(search *customsearch.CseListCall) (result Result) {
 			return
 		}
 
-		// No more search results?
+		// No more search results
 		if call.SearchInformation.TotalResults < start {
 			return
 		}
@@ -64,7 +61,7 @@ func findDomain(results []*customsearch.Result, start int64) (position int64, re
 func main() {
 	e := env.New()
 	e.String("ID", &config.id, "id of CSE")
-	e.List("KEYWORDS", &config.keywords, ",","keywords to check for")
+	e.List("KEYWORDS", &config.keywords, ",", "keywords to check for")
 	e.String("DOMAIN", &config.domain, "Domain to check for")
 	if err := e.Load(); err != nil {
 		log.WithError(err).Fatal("Parameters are missing")
@@ -87,16 +84,19 @@ func main() {
 	// your service account.
 	client := conf.Client(oauth2.NoContext)
 	cseService, err := customsearch.New(client)
+	if err != nil {
+		log.WithError(err).Fatal("customsearch.New() failed")
+	}
 
-	for _, query := range config.keywords{
+	for _, query := range config.keywords {
 		search := cseService.Cse.List(query)
 		search.Cx(config.id)
-		
+
 		result := doSearch(search)
 		clog := log.WithFields(log.Fields{
-			"Keyword": query,
+			"Keyword":       query,
 			"TotalKeywords": len(config.keywords),
-			"Domain": config.domain,
+			"Domain":        config.domain,
 		})
 		if result.Position == 0 {
 			clog.Info("Not found")
@@ -105,8 +105,8 @@ func main() {
 
 		clog = clog.WithFields(log.Fields{
 			"Position": result.Position,
-			"Title": result.Result.Title,
-			"URL": result.Result.Link,
+			"Title":    result.Result.Title,
+			"URL":      result.Result.Link,
 		})
 		clog.Info("Found")
 	}
