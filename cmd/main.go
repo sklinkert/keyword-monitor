@@ -106,7 +106,7 @@ func main() {
 		clog = clog.WithFields(log.Fields{
 			"Position": result.Position,
 			"Title":    result.Result.Title,
-			"URL":      result.Result.Link,
+			// "URL":      result.Result.Link,
 		})
 		clog.Info("Found")
 	}
